@@ -16,6 +16,7 @@ from collections import defaultdict
 # Avoid wildcard * imports
 from test_framework.blocktools import (create_block, create_coinbase)
 from test_framework.messages import CInv, MSG_BLOCK
+from test_framework.authproxy import JSONRPCException
 from test_framework.p2p import (
     P2PInterface,
     msg_block,
@@ -181,11 +182,28 @@ class ExampleTest(BitcoinTestFramework):
         self.log.info("Wait for node1 to reach current tip (height 11) using RPC")
         self.nodes[1].waitforblockheight(11)
 
+
+        self.log.info("Mine a new block in node 1")
+        my_block_hash = self.nodes[1].generate(nblocks=1)[0]
+
+        self.log.info("Test that new block is found in node 1")
+        self.nodes[1].getblock(my_block_hash)
+        self.log.info("but not in node 2")
+        try:
+            self.nodes[2].getblock(my_block_hash)
+            raise ValueError("new block is found in node 2")
+        except JSONRPCException:
+            pass
+
         self.log.info("Connect node2 and node1")
         self.connect_nodes(1, 2)
 
         self.log.info("Wait for node2 to receive all the blocks from node1")
+        self.log.info("which is equivalent to sending from node1 to node2")
         self.sync_all()
+
+        self.log.info("Test that new block is now found in node 2")
+        self.nodes[2].getblock(my_block_hash)
 
         self.log.info("Add P2P connection to node2")
         self.nodes[0].disconnect_p2ps()
